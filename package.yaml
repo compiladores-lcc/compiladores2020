@@ -39,6 +39,11 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -fwarn-tabs
+    - -fwarn-unused-imports
+    - -fwarn-missing-signatures
+    - -fwarn-name-shadowing
+    - -fwarn-incomplete-patterns
     dependencies:
     - compiladores
 

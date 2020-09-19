@@ -37,7 +37,6 @@ data UnaryOp = Succ | Pred
 -- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
 data Decl a =
     Decl { declPos :: Pos, declName :: Name, declBody :: a }
-  | Eval a
   deriving (Show,Functor)
 
 -- | AST de los términos. 

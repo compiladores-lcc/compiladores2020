@@ -16,7 +16,6 @@ import Lang
 import Global
 import MonadPCF
 import PPrint
-import Common
 import Subst
 
 

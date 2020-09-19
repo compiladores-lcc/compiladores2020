@@ -33,7 +33,6 @@ module MonadPCF (
 import Common
 import Lang
 import Global
-import PPrint
 import Errors ( Error(..) )
 import Control.Monad.State
 import Control.Monad.Except
@@ -67,7 +66,6 @@ addTy n ty = modify (\s -> s { tyEnv = (n,ty) : tyEnv s })
 
 hasName :: Name -> Decl a -> Bool
 hasName nm (Decl { declName = nm' }) = nm == nm'
-hasName _ _ = False
 
 lookupDecl :: MonadPCF m => Name -> m (Maybe Term)
 lookupDecl nm = do
