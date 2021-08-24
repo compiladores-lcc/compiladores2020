@@ -30,7 +30,7 @@ tc (V p (Free n)) bs = case lookup n bs of
                            Nothing -> failPosPCF p $ "Variable no declarada "++ppName n
                            Just ty -> return ty 
 tc (Const _ (CNat n)) _ = return NatTy
-tc (UnaryOp p u t) bs = do 
+tc (Print p str t) bs = do 
       ty <- tc t bs
       expect NatTy ty t
 tc (IfZ p c t t') bs = do
@@ -57,7 +57,15 @@ tc (Fix p f fty x xty t) bs = do
          ty' <- tc t' ((x,xty):(f,fty):bs)
          expect cod ty' t'
          return fty
-
+tc (Let p v ty def t) bs = do
+         ty' <- tc def bs
+         expect ty ty' def
+         tc (open v t) ((v,ty):bs)
+tc (BinaryOp p op t u) bs = do
+         tty <- tc t bs
+         expect NatTy tty t
+         uty <- tc t bs
+         expect NatTy uty u
 
 -- | @'typeError' t s@ lanza un error de tipo para el término @t@ 
 typeError :: MonadPCF m => Term   -- ^ término que se está chequeando  

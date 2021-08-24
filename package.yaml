@@ -26,6 +26,16 @@ dependencies:
 - pretty
 - mtl
 - exceptions
+- bytestring
+- filepath
+- binary
+- optparse-applicative
+- extra
+- llvm-hs-pure
+#- llvm-hs-pretty
+- text
+- process
+
 
 
 library:

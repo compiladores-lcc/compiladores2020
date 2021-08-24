@@ -11,7 +11,7 @@ Este módulo permite compilar módulos a la BVM. También provee una implementac
 para ejecutar bytecode.
 -}
 module Bytecompile
-  (Bytecode, bytecompileModule, runBC, bcWrite, bcRead)
+  (Bytecode, runBC, bcWrite, bcRead)
  where
 
 import Lang 
@@ -72,8 +72,6 @@ pattern PRINT    = 14
 bc :: MonadPCF m => Term -> m Bytecode
 bc t = error "implementame"
 
-bytecompileModule :: MonadPCF m => Module -> m Bytecode
-bytecompileModule mod = error "implementame"
 
 -- | Toma un bytecode, lo codifica y lo escribe un archivo 
 bcWrite :: Bytecode -> FilePath -> IO ()

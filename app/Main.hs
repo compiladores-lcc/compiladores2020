@@ -46,7 +46,7 @@ main' args = do
         lift $ catchErrors $ compileFiles args
         s <- lift $ get
         when (inter s) $ liftIO $ putStrLn
-          (  "Entorno interactivo para PCF0.\n"
+          (  "Entorno interactivo para PCF.\n"
           ++ "Escriba :? para recibir ayuda.")
         loop  
   where loop = do
@@ -90,7 +90,7 @@ handleDecl (Decl p x t) = do
         addDecl (Decl p x te)
 
 data Command = Compile CompileForm
-             | Print String
+             | PPrint String
              | Type String
              | Browse
              | Quit
@@ -127,7 +127,7 @@ commands
   =  [ Cmd [":browse"]      ""        (const Browse) "Ver los nombres en scope",
        Cmd [":load"]        "<file>"  (Compile . CompileFile)
                                                      "Cargar un programa desde un archivo",
-       Cmd [":print"]       "<exp>"   Print          "Imprime un término y sus ASTs sin evaluarlo",
+       Cmd [":print"]       "<exp>"   PPrint          "Imprime un término y sus ASTs sin evaluarlo",
        Cmd [":type"]        "<exp>"   Type           "Chequea el tipo de una expresión",
        Cmd [":quit",":Q"]        ""        (const Quit)   "Salir del intérprete",
        Cmd [":help",":?"]   ""        (const Help)   "Mostrar esta lista de comandos" ]
@@ -158,7 +158,7 @@ handleCommand cmd = do
                           CompileInteractive e -> compilePhrase e
                           CompileFile f        -> put (s {lfile=f}) >> compileFile f
                       return True
-       Print e   -> printPhrase e >> return True
+       PPrint e   -> printPhrase e >> return True
        Type e    -> typeCheckPhrase e >> return True
 
 compilePhrase ::  MonadPCF m => String -> m ()

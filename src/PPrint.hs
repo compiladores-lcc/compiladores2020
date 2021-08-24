@@ -49,7 +49,7 @@ openAll (Fix p f fty x xty t) =
     let ([f', x'], t') = openRename [f, x] t in
     Fix p f' fty x' xty (openAll t')
 openAll (IfZ p c t e) = IfZ p (openAll c) (openAll t) (openAll e)
-openAll (UnaryOp i o t) = UnaryOp i o (openAll t)
+openAll (Print i str t) = Print i str (openAll t)
 
 -- | Pretty printer de nombres (Doc)
 name2doc :: Name -> Doc
@@ -71,10 +71,6 @@ ppTy = render . ty2doc
 
 c2doc :: Const -> Doc
 c2doc (CNat n) = text (show n)
-
-unary2doc :: UnaryOp -> Doc
-unary2doc Succ = text "succ"
-unary2doc Pred = text "pred"
 
 collectApp :: NTerm -> (NTerm, [NTerm])
 collectApp t = go [] t where
@@ -116,9 +112,9 @@ t2doc at (IfZ _ c t e) =
       , text "then", nest 2 (t2doc False t)
       , text "else", nest 2 (t2doc False e) ]
 
-t2doc at (UnaryOp _ o t) =
+t2doc at (Print _ str t) =
   parenIf at $
-  unary2doc o <+> t2doc True t
+  sep [text "print", text (show str), t2doc True t]
 
 binding2doc :: (Name, Ty) -> Doc
 binding2doc (x, ty) =

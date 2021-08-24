@@ -13,10 +13,13 @@ module Parse (tm, Parse.parse, decl, runP, P, program, declOrTm) where
 import Prelude hiding ( const )
 import Lang
 import Common
-import Text.Parsec hiding (runP)
+import Text.Parsec hiding (runP,parse)
 import Data.Char ( isNumber, ord )
 import qualified Text.Parsec.Token as Tok
-import Text.ParserCombinators.Parsec.Language ( GenLanguageDef(..), emptyDef )
+import Text.ParserCombinators.Parsec.Language --( GenLanguageDef(..), emptyDef )
+import qualified Text.Parsec.Expr as Ex
+import Text.Parsec.Expr (Operator, Assoc)
+import Control.Monad.Identity (Identity)
 
 type P = Parsec String ()
 
@@ -28,9 +31,9 @@ lexer :: Tok.TokenParser u
 lexer = Tok.makeTokenParser $
         emptyDef {
          commentLine    = "#",
-         reservedNames = ["let", "fun", "fix", "then", "else", 
-                          "succ", "pred", "ifz", "Nat"],
-         reservedOpNames = ["->",":","="]
+         reservedNames = ["let", "fun", "fix", "then", "else","in", 
+                           "ifz", "print","Nat"],
+         reservedOpNames = ["->",":","=","+","-"]
         }
 
 whiteSpace :: P ()
@@ -38,6 +41,9 @@ whiteSpace = Tok.whiteSpace lexer
 
 natural :: P Integer 
 natural = Tok.natural lexer
+
+stringLiteral :: P String
+stringLiteral = Tok.stringLiteral lexer
 
 parens :: P a -> P a
 parens = Tok.parens lexer
@@ -80,31 +86,41 @@ typeP = try (do
 const :: P Const
 const = CNat <$> num
 
-unaryOpName :: P UnaryOp
-unaryOpName =
-      (reserved "succ" >> return Succ)
-  <|> (reserved "pred" >> return Pred)
-
-unaryOp :: P NTerm
-unaryOp = do
+printOp :: P NTerm
+printOp = do
   i <- getPos
-  o <- unaryOpName
+  reserved "print"
+  str <- option "" stringLiteral
   a <- atom
-  return (UnaryOp i o a)
+  return (Print i str a)
+
+binary :: String -> BinaryOp -> Assoc -> Operator String () Identity NTerm
+binary s f = Ex.Infix (reservedOp s >> return (BinaryOp NoPos f))
+
+table :: [[Operator String () Identity NTerm]]
+table = [[binary "+" Add Ex.AssocLeft,
+          binary "-" Sub Ex.AssocLeft]]
+
+expr :: P NTerm
+expr = Ex.buildExpressionParser table tm
 
 atom :: P NTerm
 atom =     (flip Const <$> const <*> getPos)
        <|> flip V <$> var <*> getPos
        <|> parens tm
+       <|> printOp
+
+-- parsea un par (variable : tipo)
+binding :: P (Name, Ty)
+binding = do v <- var
+             reservedOp ":"
+             ty <- typeP
+             return (v, ty)
 
 lam :: P NTerm
 lam = do i <- getPos
          reserved "fun"
-         (v,ty) <- parens $ do 
-                    v <- var
-                    reservedOp ":"
-                    ty <- typeP 
-                    return (v,ty)
+         (v,ty) <- parens binding
          reservedOp "->"
          t <- tm
          return (Lam i v ty t)
@@ -126,12 +142,6 @@ ifz = do i <- getPos
          e <- tm
          return (IfZ i c t e)
 
-binding :: P (Name, Ty)
-binding = do v <- var
-             reservedOp ":"
-             ty <- typeP
-             return (v, ty)
-
 fix :: P NTerm
 fix = do i <- getPos
          reserved "fix"
@@ -141,9 +151,20 @@ fix = do i <- getPos
          t <- tm
          return (Fix i f fty x xty t)
 
+letexp :: P NTerm
+letexp = do
+  i <- getPos
+  reserved "let"
+  (v,ty) <- parens binding
+  reservedOp "="  
+  def <- expr
+  reserved "in"
+  body <- expr
+  return (Let i v ty def body)
+
 -- | Parser de términos
 tm :: P NTerm
-tm = app <|> lam <|> ifz <|> unaryOp <|> fix
+tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
 
 -- | Parser de declaraciones
 decl :: P (Decl NTerm)
@@ -162,7 +183,7 @@ program = many decl
 -- | Parsea una declaración a un término
 -- Útil para las sesiones interactivas
 declOrTm :: P (Either (Decl NTerm) NTerm)
-declOrTm =  try (Left <$> decl) <|> (Right <$> tm)
+declOrTm =  try (Left <$> decl) <|> (Right <$> expr)
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada
 runP :: P a -> String -> String -> Either ParseError a
@@ -170,6 +191,6 @@ runP p s filename = runParser (whiteSpace *> p <* eof) () filename s
 
 --para debugging en uso interactivo (ghci)
 parse :: String -> NTerm
-parse s = case runP tm s "" of
+parse s = case runP expr s "" of
             Right t -> t
             Left e -> error ("no parse: " ++ show s)
