@@ -244,7 +244,7 @@ handleCommand cmd = do
        Compile c ->
                   do  case c of
                           CompileInteractive e -> compilePhrase e
-                          CompileFile f        -> put (s {lfile=f}) >> compileFile f
+                          CompileFile f        -> put (s {lfile=f, cantDecl=0}) >> compileFile f
                       return True
        Reload ->  eraseLastFileDecls >> (getLastFile >>= compileFile) >> return True
        PPrint e   -> printPhrase e >> return True
