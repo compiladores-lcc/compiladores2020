@@ -1,5 +1,5 @@
 # Compiladores
-Código para la materia Compiladores de [LCC](https://dcc.fceia.unr.edu.ar), [FCEIA](https://www.fceia.unr.edu.ar), [UNR](https://www.unr.edu.ar).
+Código para la materia Compiladores 2020 de [LCC](https://dcc.fceia.unr.edu.ar), [FCEIA](https://www.fceia.unr.edu.ar), [UNR](https://www.unr.edu.ar).
 
 Este es el código a partir del cual los estudiantes empiezan a desarrollar un compilador.
 
