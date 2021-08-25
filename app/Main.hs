@@ -20,8 +20,12 @@ import Control.Monad.Trans
 import Data.List (nub,  intersperse, isPrefixOf )
 import Data.Char ( isSpace )
 import Control.Exception ( catch , IOException )
-import System.Environment ( getArgs )
-import System.IO ( stderr, hPutStr )
+import System.IO ( hPrint, stderr, hPutStrLn )
+
+import System.Exit
+--import System.Process ( system )
+import Options.Applicative
+--import Data.Text.Lazy (unpack)
 
 import Global ( GlEnv(..) )
 import Errors
@@ -34,21 +38,88 @@ import MonadPCF
 import TypeChecker ( tc, tcDecl )
 
 prompt :: String
-prompt = "PCF> "
+prompt = "FD4> "
+
+{- 
+ Tipo para representar las banderas disponibles en línea de comando.
+-}
+data Mode =
+    Interactive
+  | Typecheck
+  -- | InteractiveCEK
+  -- | Bytecompile 
+  -- | RunVM
+  -- | CC
+  -- | Canon
+  -- | LLVM
+  -- | Build
+
+-- | Parser de banderas
+parseMode :: Parser (Mode,Bool)
+parseMode = (,) <$> 
+      (flag' Typecheck ( long "typecheck" <> short 't' <> help "Solo chequear tipos")
+  -- <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
+  -- <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
+  -- <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
+      <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
+  -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
+  -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
+  -- <|> flag' LLVM ( long "llvm" <> short 'l' <> help "Imprimir LLVM resultante")
+  -- <|> flag' Build ( long "build" <> short 'b' <> help "Compilar")
+      )
+   <*> pure False
+   -- reemplazar por la siguiente línea para habilitar opción
+   -- <*> flag False True (long "optimize" <> short 'o' <> help "Optimizar código")
+  
+-- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
+parseArgs :: Parser (Mode,Bool, [FilePath])
+parseArgs = (\(a,b) c -> (a,b,c)) <$> parseMode <*> many (argument str (metavar "FILES..."))
 
 main :: IO ()
-main = do args <- getArgs
-          runPCF (runInputT defaultSettings (main' args))
-          return ()
-          
-main' :: (MonadPCF m, MonadMask m) => [String] -> InputT m ()
-main' args = do
-        lift $ catchErrors $ compileFiles args
-        s <- lift $ get
-        when (inter s) $ liftIO $ putStrLn
-          (  "Entorno interactivo para PCF.\n"
-          ++ "Escriba :? para recibir ayuda.")
-        loop  
+main = execParser opts >>= go
+  where
+    opts = info (parseArgs <**> helper)
+      ( fullDesc
+     <> progDesc "Compilador de FD4"
+     <> header "Compilador de FD4 de la materia Compiladores 2021" )
+
+    go :: (Mode,Bool,[FilePath]) -> IO ()
+    go (Interactive,_,files) = 
+              do runPCF (runInputT defaultSettings (repl files))
+                 return ()
+    go (Typecheck,_, files) =
+              runOrFail $ mapM_ typecheckFile files
+    -- go (InteractiveCEK,_, files) = undefined
+    -- go (Bytecompile,_, files) =
+    --           runOrFail $ mapM_ bytecompileFile files
+    -- go (RunVM,_,files) =
+    --           runOrFail $ mapM_ bytecodeRun files
+    -- go (CC,_, files) =
+    --           runOrFail $ mapM_ ccFile files
+    -- go (Canon,_, files) =
+    --           runOrFail $ mapM_ canonFile files 
+    -- go (LLVM,_, files) =
+    --           runOrFail $ mapM_ llvmFile files
+    -- go (Build,_, files) =
+    --           runOrFail $ mapM_ buildFile files
+
+runOrFail :: PCF a -> IO a
+runOrFail m = do
+  r <- runPCF m
+  case r of
+    Left err -> do
+      liftIO $ hPrint stderr err
+      exitWith (ExitFailure 1)
+    Right v -> return v
+
+repl :: (MonadPCF m, MonadMask m) => [String] -> InputT m ()
+repl args = do
+       lift $ catchErrors $ compileFiles args
+       s <- lift get
+       when (inter s) $ liftIO $ putStrLn
+         (  "Entorno interactivo para LD4.\n"
+         ++ "Escriba :? para recibir ayuda.")
+       loop
   where loop = do
            minput <- getInputLine prompt
            case minput of
@@ -57,24 +128,39 @@ main' args = do
                Just x -> do
                        c <- liftIO $ interpretCommand x
                        b <- lift $ catchErrors $ handleCommand c
-                       maybe loop (flip when loop) b
- 
-compileFiles ::  MonadPCF m => [String] -> m ()
+                       maybe loop (`when` loop) b
+
+compileFiles ::  MonadPCF m => [FilePath] -> m ()
 compileFiles []     = return ()
 compileFiles (x:xs) = do
         modify (\s -> s { lfile = x, inter = False })
         compileFile x
         compileFiles xs
 
-compileFile ::  MonadPCF m => String -> m ()
+loadFile ::  MonadPCF m => FilePath -> m [Decl NTerm]
+loadFile f = do
+    let filename = reverse(dropWhile isSpace (reverse f))
+    x <- liftIO $ catch (readFile filename)
+               (\e -> do let err = show (e :: IOException)
+                         hPutStrLn stderr ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err)
+                         return "")
+    setLastFile filename
+    parseIO filename program x
+
+compileFile ::  MonadPCF m => FilePath -> m ()
 compileFile f = do
     printPCF ("Abriendo "++f++"...")
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
                (\e -> do let err = show (e :: IOException)
-                         hPutStr stderr ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err ++"\n")
+                         hPutStrLn stderr ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err)
                          return "")
     decls <- parseIO filename program x
+    mapM_ handleDecl decls
+
+typecheckFile ::  MonadPCF m => FilePath -> m ()
+typecheckFile f = do
+    decls <- loadFile f
     mapM_ handleDecl decls
 
 parseIO ::  MonadPCF m => String -> P a -> String -> m a
@@ -92,6 +178,7 @@ handleDecl (Decl p x t) = do
 data Command = Compile CompileForm
              | PPrint String
              | Type String
+             | Reload
              | Browse
              | Quit
              | Help
@@ -128,6 +215,7 @@ commands
        Cmd [":load"]        "<file>"  (Compile . CompileFile)
                                                      "Cargar un programa desde un archivo",
        Cmd [":print"]       "<exp>"   PPrint          "Imprime un término y sus ASTs sin evaluarlo",
+       Cmd [":reload"]      ""        (const Reload)         "Vuelve a cargar el último archivo cargado",
        Cmd [":type"]        "<exp>"   Type           "Chequea el tipo de una expresión",
        Cmd [":quit",":Q"]        ""        (const Quit)   "Salir del intérprete",
        Cmd [":help",":?"]   ""        (const Help)   "Mostrar esta lista de comandos" ]
@@ -158,6 +246,7 @@ handleCommand cmd = do
                           CompileInteractive e -> compilePhrase e
                           CompileFile f        -> put (s {lfile=f}) >> compileFile f
                       return True
+       Reload ->  eraseLastFileDecls >> (getLastFile >>= compileFile) >> return True
        PPrint e   -> printPhrase e >> return True
        Type e    -> typeCheckPhrase e >> return True
 

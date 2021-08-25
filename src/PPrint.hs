@@ -39,17 +39,22 @@ openAll :: Term -> NTerm
 openAll (V p v) = case v of 
       Bound i ->  V p $ "(Bound "++show i++")" --este caso no debería aparecer
                                                --si el término es localmente cerrado
-      Free x -> V p x 
+      Free x -> V p x
+      Global x -> V p x
 openAll (Const p c) = Const p c
 openAll (Lam p x ty t) =
-    let ([x'], t') = openRename [x] t in
-    Lam p x' ty (openAll t')
+    let ([x'], t') = openRename [x] t 
+    in  Lam p x' ty (openAll t')
 openAll (App p t u) = App p (openAll t) (openAll u)
 openAll (Fix p f fty x xty t) =
-    let ([f', x'], t') = openRename [f, x] t in
-    Fix p f' fty x' xty (openAll t')
+    let ([f', x'], t') = openRename [f, x] t
+    in  Fix p f' fty x' xty (openAll t')
 openAll (IfZ p c t e) = IfZ p (openAll c) (openAll t) (openAll e)
-openAll (Print i str t) = Print i str (openAll t)
+openAll (Print p str t) = Print p str (openAll t)
+openAll (BinaryOp p op t u) = BinaryOp p op (openAll t) (openAll u)
+openAll (Let p v ty m n) = 
+    let ([v'], n') = openRename [v] n 
+    in  Let p v' ty (openAll m) (openAll n')
 
 -- | Pretty printer de nombres (Doc)
 name2doc :: Name -> Doc
@@ -115,6 +120,21 @@ t2doc at (IfZ _ c t e) =
 t2doc at (Print _ str t) =
   parenIf at $
   sep [text "print", text (show str), t2doc True t]
+t2doc at (Let _ v ty m n) =
+  parenIf at $
+  sep [text "let",
+       binding2doc (v,ty),
+       text "=",
+       t2doc False m,
+       text "in",
+       t2doc False n]
+t2doc at (BinaryOp _ op t u) = parens $ sep [ t2doc at t
+                                            , binary2doc op 
+                                            , t2doc at u]
+
+binary2doc :: BinaryOp -> Doc
+binary2doc Add = text "+"
+binary2doc Sub = text "-"
 
 binding2doc :: (Name, Ty) -> Doc
 binding2doc (x, ty) =

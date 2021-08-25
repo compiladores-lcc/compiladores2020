@@ -29,6 +29,9 @@ tc (V p (Bound _)) _ = failPosPCF p "typecheck: No deberia haber variables Bound
 tc (V p (Free n)) bs = case lookup n bs of
                            Nothing -> failPosPCF p $ "Variable no declarada "++ppName n
                            Just ty -> return ty 
+tc (V p (Global n)) bs = case lookup n bs of
+                           Nothing -> failPosPCF p $ "Variable no declarada "++ppName n
+                           Just ty -> return ty
 tc (Const _ (CNat n)) _ = return NatTy
 tc (Print p str t) bs = do 
       ty <- tc t bs

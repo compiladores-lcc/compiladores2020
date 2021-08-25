@@ -107,7 +107,7 @@ expr = Ex.buildExpressionParser table tm
 atom :: P NTerm
 atom =     (flip Const <$> const <*> getPos)
        <|> flip V <$> var <*> getPos
-       <|> parens tm
+       <|> parens expr
        <|> printOp
 
 -- parsea un par (variable : tipo)
@@ -122,7 +122,7 @@ lam = do i <- getPos
          reserved "fun"
          (v,ty) <- parens binding
          reservedOp "->"
-         t <- tm
+         t <- expr
          return (Lam i v ty t)
 
 -- Nota el parser app también parsea un solo atom.
@@ -135,11 +135,11 @@ app = (do i <- getPos
 ifz :: P NTerm
 ifz = do i <- getPos
          reserved "ifz"
-         c <- tm
+         c <- expr
          reserved "then"
-         t <- tm
+         t <- expr
          reserved "else"
-         e <- tm
+         e <- expr
          return (IfZ i c t e)
 
 fix :: P NTerm
@@ -148,7 +148,7 @@ fix = do i <- getPos
          (f, fty) <- parens binding
          (x, xty) <- parens binding
          reservedOp "->"
-         t <- tm
+         t <- expr
          return (Fix i f fty x xty t)
 
 letexp :: P NTerm
@@ -173,7 +173,7 @@ decl = do
      reserved "let"
      v <- var
      reservedOp "="
-     t <- tm
+     t <- expr
      return (Decl i v t)
 
 -- | Parser de programas (listas de declaraciones) 

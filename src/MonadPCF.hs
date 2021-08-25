@@ -20,6 +20,9 @@ module MonadPCF (
   lookupDecl,
   lookupTy,
   printPCF,
+  setLastFile,
+  getLastFile,
+  eraseLastFileDecls,
   failPosPCF,
   failPCF,
   addDecl,
@@ -37,6 +40,7 @@ import Errors ( Error(..) )
 import Control.Monad.State
 import Control.Monad.Except
 import System.IO
+import Data.List (deleteFirstsBy)
 
 -- * La clase 'MonadPCFm'
 
@@ -58,12 +62,26 @@ class (MonadIO m, MonadState GlEnv m, MonadError Error m) => MonadPCF m where
 printPCF :: MonadPCF m => String -> m ()
 printPCF = liftIO . putStrLn
 
+setLastFile :: MonadPCF m => FilePath -> m ()
+setLastFile filename = modify (\s -> s {lfile = filename})
+
+getLastFile :: MonadPCF m => m FilePath
+getLastFile = gets lfile
+
 addDecl :: MonadPCF m => Decl Term -> m ()
-addDecl d = modify (\s -> s { glb = d : glb s })
+addDecl d = modify (\s -> s { glb = d : glb s, cantDecl = cantDecl s + 1 })
   
 addTy :: MonadPCF m => Name -> Ty -> m ()
 addTy n ty = modify (\s -> s { tyEnv = (n,ty) : tyEnv s })
 
+eraseLastFileDecls :: MonadPCF m => m ()
+eraseLastFileDecls = do 
+      s <- get
+      let n = cantDecl s
+          (era,rem) = splitAt n (glb s)
+          tyEnv' = deleteTy (map declName era) (tyEnv s)
+      modify (\s -> s {glb = rem, cantDecl = 0, tyEnv = tyEnv'})
+   where deleteTy xs ps = deleteFirstsBy (\x y -> fst x == fst y) ps (map (flip (,) NatTy) xs)
 hasName :: Name -> Decl a -> Bool
 hasName nm (Decl { declName = nm' }) = nm == nm'
 

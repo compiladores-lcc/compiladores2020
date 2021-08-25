@@ -24,7 +24,7 @@ semOp Sub x y = max 0 (x - y)
 
 -- | Evaluador de términos CBV
 eval ::  MonadPCF m => Term -> m Term
-eval (V _ (Free nm)) = do
+eval (V _ (Global nm)) = do
   -- unfold and keep going
   mtm <- lookupDecl nm 
   case mtm of 
